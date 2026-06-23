@@ -106,7 +106,6 @@
       // ===== 解析 URL 参数 =====
       var params = new URLSearchParams(location.search);
       var UID = params.get('uid') || 'default';
-      var STORAGE_KEY = 'faceDescriptor_' + UID;
 
       // ===== DOM 引用 =====
       var $ = function(id) { return document.getElementById(id); };
@@ -126,7 +125,7 @@
 
       // ===== 状态 =====
       var mode = 'enroll';         // enroll | verify
-      var storedDescriptor = null; // 已存储的描述子（验证模式用）
+      var storedDescriptor = null; // URL ref 传入的描述子（验证模式用）
       var currentDescriptor = null;
       var resultData = null;       // 最终回传给小程序的数据
       var stream = null;
@@ -135,29 +134,30 @@
       var STABILITY_NEEDED = 1;        // need 1 stable detection
       var DETECTION_INTERVAL = 300;    // detect every 300ms
 
-      // ===== 初始化：从 localStorage 判断模式 =====
+      // ===== 初始化：从 URL ref 参数获取已存储的描述子 =====
       function initMode() {
         if (!params.get('uid') || params.get('uid').trim() === '') {
           showError('缺少用户标识 (uid)');
           setStatus('error', '缺少用户标识');
           return false;
         }
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
+        // ref 参数: 小程序通过 URL 传入的已编码描述子
+        var ref = params.get('ref');
+        if (ref) {
           try {
-            storedDescriptor = JSON.parse(raw);
-            mode = 'verify';
-            headerTitle.textContent = '第二步：人脸识别验证';
-            hintText.textContent = '请将人脸对准框内，保持不动即可自动验证';
-          } catch (e) {
-            storedDescriptor = null;
-          }
+            storedDescriptor = ref.split(',').map(Number);
+            if (storedDescriptor.length === 128) {
+              mode = 'verify';
+              headerTitle.textContent = '第二步：人脸识别验证';
+              hintText.textContent = '请将人脸对准框内，保持不动即可自动验证';
+              return true;
+            }
+          } catch (e) { /* parse error, fall through to enroll */ }
         }
-        if (!storedDescriptor) {
-          mode = 'enroll';
-          headerTitle.textContent = '第一步：人脸采集录入';
-          hintText.textContent = '请将人脸对准框内，保持不动即可自动采集';
-        }
+        mode = 'enroll';
+        headerTitle.textContent = '第一步：人脸采集录入';
+        hintText.textContent = '请将人脸对准框内，保持不动即可自动采集';
+        return true;
       }
 
       function showError(msg) {
@@ -431,7 +431,7 @@
         }
       }
 
-      // 采集模式：保存描述子到 localStorage
+      // 采集模式：不再存本地，描述子通过 postMessage 回传小程序存储
       function handleEnroll() {
         if (!Array.isArray(currentDescriptor) || currentDescriptor.length !== 128) {
           showError('描述子数据异常，请重新拍照');
@@ -440,7 +440,6 @@
           retry();
           return;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentDescriptor));
         statusDot.className = 'dot dot-green';
         statusText.textContent = '录入完成';
         hintText.textContent = '';
@@ -528,15 +527,6 @@
         }
       }
 
-      // 清理 localStorage（重新录入时用）
-      function clearStored() {
-        localStorage.removeItem(STORAGE_KEY);
-        storedDescriptor = null;
-        mode = 'enroll';
-        headerTitle.textContent = '第一步：人脸采集录入';
-        hintText.textContent = '请将人脸移至取景框内，录入已重置';
-      }
-
       // ===== 完成 → 回传小程序 =====
       function finish() {
         wx.miniProgram.postMessage({ data: resultData });
@@ -570,18 +560,6 @@
       // 绑定事件
       doneBtn.addEventListener('click', finish);
       retryBtn.addEventListener('click', retry);
-
-      // 长按"重新采集"可清除 localStorage（调试用）
-      retryBtn.addEventListener('longpress', function() {
-        clearStored();
-        retry();
-      });
-      // 也监听 contextmenu（右键）作为 PC 调试入口
-      retryBtn.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        clearStored();
-        retry();
-      });
 
       // ===== 启动 =====
       var valid = initMode();
