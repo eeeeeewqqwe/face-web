@@ -135,14 +135,14 @@
       var STABILITY_NEEDED = 1;        // need 1 stable detection
       var DETECTION_INTERVAL = 300;    // detect every 300ms
 
-      // ===== 初始化：从 sessionStorage 判断模式 =====
+      // ===== 初始化：从 localStorage 判断模式 =====
       function initMode() {
         if (!params.get('uid') || params.get('uid').trim() === '') {
           showError('缺少用户标识 (uid)');
           setStatus('error', '缺少用户标识');
           return false;
         }
-        var raw = sessionStorage.getItem(STORAGE_KEY);
+        var raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           try {
             storedDescriptor = JSON.parse(raw);
@@ -431,7 +431,7 @@
         }
       }
 
-      // 采集模式：保存描述子到 sessionStorage
+      // 采集模式：保存描述子到 localStorage
       function handleEnroll() {
         if (!Array.isArray(currentDescriptor) || currentDescriptor.length !== 128) {
           showError('描述子数据异常，请重新拍照');
@@ -440,7 +440,7 @@
           retry();
           return;
         }
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(currentDescriptor));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentDescriptor));
         statusDot.className = 'dot dot-green';
         statusText.textContent = '录入完成';
         hintText.textContent = '';
@@ -528,9 +528,9 @@
         }
       }
 
-      // 清理 sessionStorage（重新录入时用）
+      // 清理 localStorage（重新录入时用）
       function clearStored() {
-        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
         storedDescriptor = null;
         mode = 'enroll';
         headerTitle.textContent = '第一步：人脸采集录入';
@@ -571,7 +571,7 @@
       doneBtn.addEventListener('click', finish);
       retryBtn.addEventListener('click', retry);
 
-      // 长按"重新采集"可清除 sessionStorage（调试用）
+      // 长按"重新采集"可清除 localStorage（调试用）
       retryBtn.addEventListener('longpress', function() {
         clearStored();
         retry();
